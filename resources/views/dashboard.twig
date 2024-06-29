@@ -1,22 +1,22 @@
 {% extends "layout.twig" %}
 {% block content %}
     <div class="px-4 sm:px-6 lg:px-8">
-        <div class="container mx-auto p-6" x-data='dataGrid({{ agents | json_encode | raw }})'>
-            <div class="grid grid-cols-4 gap-4 mb-6">
+        <div class="container mx-auto p-6" x-data='dataGrid({{ realtimeData | json_encode | raw }})'>
+            <div class="grid grid-cols-4 gap-4 mb-6" >
                 <div class="bg-blue-500 text-white p-4 rounded shadow-lg">
-                    <div class="text-2xl font-bold">5301</div>
+                    <div class="text-2xl font-bold" x-text="todayCalls" ></div>
                     <div>Calls Today</div>
                 </div>
                 <div class="bg-green-500 text-white p-4 rounded shadow-lg">
-                    <div class="text-2xl font-bold">2082</div>
+                    <div class="text-2xl font-bold" x-text="answeredCalls"></div>
                     <div>Answered</div>
                 </div>
                 <div class="bg-red-500 text-white p-4 rounded shadow-lg">
-                    <div class="text-2xl font-bold">107 / 5.14%</div>
+                    <div class="text-2xl font-bold" x-text="dropPercent" >%</div>
                     <div>Dropped</div>
                 </div>
                 <div class="bg-purple-500 text-white p-4 rounded shadow-lg">
-                    <div class="text-2xl font-bold">3112</div>
+                    <div class="text-2xl font-bold" x-text="outGoing" ></div>
                     <div>Outgoing</div>
                 </div>
             </div>
@@ -68,12 +68,17 @@
         </div>
 
         <script>
-            function dataGrid(agents) {
+            function dataGrid(realtimeData) {
                 return {
                     searchQuery: '',
                     sortByField: '',
                     sortDesc: false,
-                    agents: agents,
+                    agents: realtimeData.agents,
+                    todayCalls: realtimeData.stats.calls_today,
+                    dropCalls: realtimeData.stats.drop_calls,
+                    answeredCalls: realtimeData.stats.answers_today,
+                    dropPercent: realtimeData.stats.drop_percent,
+                    outGoing:realtimeData.stats.outbound_today,
                     get filteredAgents() {
                         let result = this.agents;
                         if (this.searchQuery) {
@@ -111,6 +116,7 @@
                     }
                 }
             }
+
         </script>
     </div>
 {% endblock %}

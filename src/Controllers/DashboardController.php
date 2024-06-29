@@ -16,8 +16,8 @@ class DashboardController
     {
         $realtimeService = $this->container->get('RealtimeService');
 
-        $agents = $realtimeService->getRealtimeData();
+        $realtimeData = $realtimeService->getRealtimeData();
         $view = $this->container->get('view');
-        return new Response($view->render('dashboard.twig', ['agents' => $agents]));
+        return new Response($view->render('dashboard.twig', ['realtimeData' => $realtimeData]));
     }
 }
