@@ -1,0 +1,17 @@
+{
+  "name": "vici-realtime-dashboard",
+  "version": "1.0.0",
+  "description": "This is a simple PHP starter kit created by the PHP dominicana community. It is designed to help you get started with PHP development quickly. It includes a simple web server, a simple router It is designed to be simple and easy to use.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build:css": "tailwindcss build resources/css/styles.css -o public/output.css",
+    "watch:css": "tailwindcss -i resources/css/styles.css -o public/output.css --watch"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "tailwindcss": "^3.4.4"
+  }
+}

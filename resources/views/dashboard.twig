@@ -1,0 +1,116 @@
+{% extends "layout.twig" %}
+{% block content %}
+    <div class="px-4 sm:px-6 lg:px-8">
+        <div class="container mx-auto p-6" x-data='dataGrid({{ agents | json_encode | raw }})'>
+            <div class="grid grid-cols-4 gap-4 mb-6">
+                <div class="bg-blue-500 text-white p-4 rounded shadow-lg">
+                    <div class="text-2xl font-bold">5301</div>
+                    <div>Calls Today</div>
+                </div>
+                <div class="bg-green-500 text-white p-4 rounded shadow-lg">
+                    <div class="text-2xl font-bold">2082</div>
+                    <div>Answered</div>
+                </div>
+                <div class="bg-red-500 text-white p-4 rounded shadow-lg">
+                    <div class="text-2xl font-bold">107 / 5.14%</div>
+                    <div>Dropped</div>
+                </div>
+                <div class="bg-purple-500 text-white p-4 rounded shadow-lg">
+                    <div class="text-2xl font-bold">3112</div>
+                    <div>Outgoing</div>
+                </div>
+            </div>
+            <div class="mb-4 flex justify-between items-center">
+                <h2 class="text-2xl font-bold">Agents</h2>
+                <input type="text" class="border rounded p-2" placeholder="Search" x-model="searchQuery">
+            </div>
+
+            <table class="min-w-full bg-white shadow rounded-lg overflow-hidden">
+                <thead class="bg-gray-200">
+                <tr>
+                    <th class="py-2 px-4 text-left cursor-pointer">Station</th>
+                    <th class="py-2 px-4 text-left cursor-pointer">Phone</th>
+                    <th class="py-2 px-4 text-left cursor-pointer">User</th>
+                    <th class="py-2 px-4 text-left cursor-pointer">Group</th>
+                    <th class="py-2 px-4 text-left cursor-pointer">SessionID</th>
+                    <th class="py-2 px-4 text-left cursor-pointer" >Status</th>
+                    <th class="py-2 px-4 text-left cursor-pointer">CustPhone</th>
+                    <th class="py-2 px-4 text-left cursor-pointer">MM:SS</th>
+                    <th class="py-2 px-4 text-left cursor-pointer">Campaign</th>
+                    <th class="py-2 px-4 text-left cursor-pointer">Calls</th>
+                    <th class="py-2 px-4 text-left cursor-pointer">Call Type</th>
+                    <th class="py-2 px-4 text-left" >Action</th>
+                </tr>
+                </thead>
+                <tbody>
+                <template x-for="agent in filteredAgents" :key="agent.live_agent_id">
+                    <tr>
+                        <td class="py-2 px-4" x-text="agent.extension"></td>
+                        <td class="py-2 px-4" x-text="agent.phone"></td>
+                        <td class="py-2 px-4" x-text="agent.user"></td>
+                        <td class="py-2 px-4" x-text="agent.userGroup"></td>
+                        <td class="py-2 px-4" x-text="agent.sessionid"></td>
+                        <td class="py-2 px-4">
+                            <span class="p-1 rounded" :class="statusClass(agent.status)" x-text="agent.status"></span>
+                        </td>
+                        <td class="py-2 px-4" x-text="agent.custPhone"></td>
+                        <td class="py-2 px-4" x-text="agent.callTime"></td>
+                        <td class="py-2 px-4" x-text="agent.campaignId"></td>
+                        <td class="py-2 px-4" x-text="agent.callCount"></td>
+                        <td class="py-2 px-4" x-text="agent.callType"></td>
+                        <td class="py-2 px-4">
+                            <button x-show="agent.status == '3-WAY'" class="bg-blue-500 text-white px-2 py-1 rounded">▶</button>
+                        </td>
+                    </tr>
+                </template>
+                </tbody>
+            </table>
+        </div>
+
+        <script>
+            function dataGrid(agents) {
+                return {
+                    searchQuery: '',
+                    sortByField: '',
+                    sortDesc: false,
+                    agents: agents,
+                    get filteredAgents() {
+                        let result = this.agents;
+                        if (this.searchQuery) {
+                            result = result.filter(agent => Object.values(agent).some(value => value.toString().toLowerCase().includes(this.searchQuery.toLowerCase())));
+                        }
+                        if (this.sortByField) {
+                            result.sort((a, b) => {
+                                if (this.sortDesc) {
+                                    return a[this.sortByField] > b[this.sortByField] ? -1 : 1;
+                                }
+                                return a[this.sortByField] < b[this.sortByField] ? -1 : 1;
+                            });
+                        }
+                        return result;
+                    },
+                    sortBy(field) {
+                        if (this.sortByField === field) {
+                            this.sortDesc = !this.sortDesc;
+                        } else {
+                            this.sortByField = field;
+                            this.sortDesc = false;
+                        }
+                    },
+                    statusClass(status) {
+                        switch (status) {
+                            case 'INCALL':
+                                return 'bg-green-200 text-green-800';
+                            case '3-WAY':
+                                return 'bg-yellow-200 text-yellow-800';
+                            case 'CLOSER':
+                                return 'bg-red-200 text-red-800';
+                            default:
+                                return 'bg-gray-200 text-gray-800';
+                        }
+                    }
+                }
+            }
+        </script>
+    </div>
+{% endblock %}
