@@ -3,7 +3,11 @@
 namespace Phpdominicana\Lightwave\Providers;
 
 use Phpdominicana\Lightwave\Application;
+use Phpdominicana\Lightwave\Database\DatabasePDO;
 use Phpdominicana\Lightwave\Gateways\Realtime\RealtimeRepository;
+use Phpdominicana\Lightwave\Gateways\VicidialCampaignStats\CampaignStatsFactory;
+use Phpdominicana\Lightwave\Gateways\VicidialCampaignStats\VicidialCampaignStatsGateway;
+use Phpdominicana\Lightwave\Gateways\VicidialCampaignStats\VicidialCampaignStatsRepository;
 use Phpdominicana\Lightwave\Gateways\VicidiaLiveAgent\VicidialLiveAgentGateway;
 use Phpdominicana\Lightwave\Services\RealtimeService;
 use Phpdominicana\Lightwave\Services\VicidialLiveAgentService;
@@ -22,7 +26,16 @@ class AppServiceProvider implements ProviderInterface
             [],
             [],
             [],
+            true,
+            '',
+            $container['psr11Container'],
         );
         $container['RealtimeService'] = fn () => new RealtimeService($app->getContainer()['psr11Container']);
+        $container['VicidialCampaignStatsRepository'] = fn () => new VicidialCampaignStatsRepository(
+            new VicidialCampaignStatsGateway(
+                new DatabasePDO($container['pdo']),
+                new CampaignStatsFactory(),
+            )
+        );
     }
 }
