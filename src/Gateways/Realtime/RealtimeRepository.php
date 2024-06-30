@@ -416,21 +416,6 @@ final class RealtimeRepository
 
             if(in_array($agents['status'],["DEAD","DISPO","PAUSED"]) && $call_time_S >= 21600) continue;
 
-            if($agents['status'] == "PAUSED"){
-                if ($agents_pause_code_active > 0)
-                {
-                    $pcode = $this->getPauseCode($agents['agent_log_id'],$agents['user']);
-                    if($pcode && !empty($pcode))
-                        $pausecode = sprintf("%-6s", $pcode);
-                    else
-                        $pausecode = "N/A";
-                }
-                else
-                {
-                    $pausecode='N/A';
-                }
-            }
-
 
             $vcAgent = [];
             $vcAgent['extension'] = $agents['extension'];
@@ -450,13 +435,23 @@ final class RealtimeRepository
             $vcAgent['call_time'] = $call_time_MS;
             $vcAgent['call_type'] = 0;
 
-            $this -> vcAgentsArray[] = $vcAgent;
+            $this->vcAgentsArray[] = $vcAgent;
         }
     }
 
     public function getBoxStatus(): array
     {
-        return [];
+        $agent['active_calls'] = $this->boxOutTotal;
+        $agent['call_ringing'] = $this->boxOutRing;
+        $agent['call_waiting'] = $this->boxOutLive;
+        $agent['call_ivr'] = $this->boxInIvr;
+        $agent['total_agents'] = $this->boxAgentTotal;
+        $agent['agents_in_call'] = $this->boxAgentIncall;
+        $agent['agents_waiting'] = $this->boxAgentReady;
+        $agent['agents_paused'] = $this->boxAgentPaused;
+        $agent['agents_dead'] = $this->boxAgentDead;
+        $agent['agents_dispo'] = $this-> boxAgentDispo;
+        return $agent;
     }
 
     public function getRealtimeData(): array
