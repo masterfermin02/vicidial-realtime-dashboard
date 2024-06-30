@@ -25,6 +25,13 @@ final class RealtimeRepository
 
     protected int $boxRingAgents = 0;
 
+    protected int $boxAgentTotal = 0;
+    protected int $boxAgentDead = 0;
+    protected int $boxAgentDispo = 0;
+    protected int $boxAgentPaused = 0;
+    protected int $boxAgentIncall = 0;
+    protected int $boxAgentReady = 0;
+
     public function __construct(
         protected string $isInbound,
         protected array $miniStatsArray,
@@ -387,16 +394,16 @@ final class RealtimeRepository
                     break;
                 case "PAUSED":
                     if($call_time_S < 21600){
-                        $this -> boxAgentTotal++;
-                        $this -> boxAgentPaused++;
+                        $this->boxAgentTotal++;
+                        $this->boxAgentPaused++;
                     }
                     break;
                 case "INCALL":
                 case "3-WAY":
                 case "QUEUE":
-                    $this -> boxAgentIncall++;
-                    $this -> box_agent_total++;
-                    $custPhone = isset($this->vcCustPhonesArray[$agents['lead_id']]) ? $this->vcCustPhonesArray[$agents['lead_id']] : "";
+                    $this->boxAgentIncall++;
+                    $this->boxAgentTotal++;
+                    $custPhone = $this->vcCustPhonesArray[$agents['lead_id']] ?? "";
 
                     break;
                 case "READY":
