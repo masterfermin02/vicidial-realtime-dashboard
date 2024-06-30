@@ -2,29 +2,43 @@
 
 namespace Phpdominicana\Lightwave\Gateways\Realtime;
 
+use Phpdominicana\Lightwave\Database\DataBaseInterface;
+use Phpdominicana\Lightwave\Gateways\VicidialCampaigns\VicidialCampaignRepository;
 use Phpdominicana\Lightwave\Gateways\VicidialCampaignStats\VicidialCampaignStatsRepository;
 use Pimple\Psr11\Container;
 
 final class RealtimeRepository
 {
-    public VicidialCampaignStatsRepository $vicidialCampaignStatsRepository;
+    protected VicidialCampaignStatsRepository $vicidialCampaignStatsRepository;
+    protected VicidialCampaignRepository $vicidialCampaignRepository;
+
+    protected DataBaseInterface $db;
+
+    protected int $boxOutLive = 0;
+    protected int $boxAgentonlycount = 0;
+    protected int $boxInIvr = 0;
+    protected int $boxOutRing = 0;
+    protected int $boxOutTotal = 0;
+
     public function __construct(
-        public string $isInbound,
-        public array $miniStatsArray,
-        public array $vcAgentsArray,
-        public array $vcWaitingList,
-        public bool $isVSCAT,
-        public string $closerCampaign,
-        public Container $container,
+        protected string $isInbound,
+        protected array $miniStatsArray,
+        protected array $vcAgentsArray,
+        protected array $vcWaitingList,
+        protected bool $isVSCAT,
+        protected string $closerCampaign,
+        protected Container $container,
+        protected array $selectedCampaignIds = [],
+        protected bool $returnAllActive = true,
     )
     {
         $this->vicidialCampaignStatsRepository = $this->container->get('VicidialCampaignStatsRepository');
+        $this->vicidialCampaignRepository = $this->container->get('VicidialCampaignRepository');
+        $this->db = $this->container->get('DataBaseInterface');
     }
 
     public function inboundOnlyMiniStats(): void
     {
-
-
         $result = $this->vicidialCampaignStatsRepository->getById($this->closerCampaign);
 
         $this->miniStatsArray['calls_today'] = $result->sumCallsToday;
@@ -42,7 +56,6 @@ final class RealtimeRepository
             $this->miniStatsArray['max_status_category_4'] = $result->maxStatusCategory4;
             $this->miniStatsArray['sum_status_category_count_4'] = $result->sumStatusCategoryCount4;
         }
-
 
         $this->miniStatsArray['drop_percent'] = sprintf("%01.2f",
             round(($this->MathZDC($this->miniStatsArray['drops_today'], $this->miniStatsArray['answers_today']) * 100), 2)
@@ -69,12 +82,136 @@ final class RealtimeRepository
 
     public function completeMiniStats(): void
     {
+        $viciResult = $this->vicidialCampaignRepository->getRealtimeDataByCampaignIds(
+            !$this->returnAllActive && $this->isInbound == "YES"
+                ? array_merge($this->selectedCampaignIds, [$this->closerCampaign])
+                : $this->selectedCampaignIds
+        );
 
+        $selects = [];
+        $selects[] = "sum(dialable_leads) as sum_dialable_leads";
+        $selects[] = "sum(calls_today) as sum_calls_today";
+        $selects[] = "sum(drops_today) as sum_drops_today";
+
+        $selects[] = "avg(drops_answers_today_pct) as avg_drops_answers_today_pct";
+        $selects[] = "avg(differential_onemin) as avg_differential_onemin";
+        $selects[] = "avg(agents_average_onemin) as avg_agents_average_onemin";
+
+
+        $selects[] = "sum(balance_trunk_fill) as sum_balance_trunk_fill";
+        $selects[] = "sum(answers_today) as sum_answers_today";
+
+        if ($this->isVSCAT) {
+            $selects[] = "max(status_category_1) as max_status_category_1";
+            $selects[] = "sum(status_category_count_1) as sum_status_category_count_1";
+            $selects[] = "max(status_category_2) as max_status_category_2";
+            $selects[] = "sum(status_category_count_2) as sum_status_category_count_2";
+            $selects[] = "max(status_category_3) as max_status_category_3";
+            $selects[] = "sum(status_category_count_3) as sum_status_category_count_3";
+            $selects[] = "max(status_category_4) as max_status_category_4";
+            $selects[] = "sum(status_category_count_4) as sum_status_category_count_4";
+        }
+
+        $selects[] = "sum(agent_calls_today) as sum_agent_calls_today";
+        $selects[] = "sum(agent_wait_today) as sum_agent_wait_today";
+        $selects[] = "sum(agent_custtalk_today) as sum_agent_custtalk_today";
+        $selects[] = "sum(agent_acw_today) as sum_agent_acw_today";
+        $selects[] = "sum(agent_pause_today) as sum_agent_pause_today";
+        $selects[] = "sum(agenthandled_today) as sum_agenthandled_today";
+
+        $query = $this->db->table("vicidial_campaign_stats")
+            ->select($selects)
+            ->whereIn("campaign_id", $this->selectedCampaignIds)
+            ->where("calls_today", ">", "-1");
+
+        if ($this->isInbound == "YES") {
+            $query->whereIn("campaign_id", array_merge($this->selectedCampaignIds, [$this->closerCampaign]));
+        } else {
+            $query->whereIn("campaign_id", $this->selectedCampaignIds);
+        }
+        $viciStatsResult = $query->first();
+
+        $this->miniStatsArray['dial_level'] = sprintf("%01.3f", $viciResult->avgAutoDialLevel);
+        $this->miniStatsArray['trunk_short_fill'] = 0;
+        $this->miniStatsArray['dial_filter'] = $viciResult->minLeadFilterId;
+        $this->miniStatsArray['dialable_leads'] = $viciStatsResult['sum_dialable_leads'] ?? 0;
+        $this->miniStatsArray['calls_today'] = $viciStatsResult['sum_calls_today'] ?? 0;
+        $this->miniStatsArray['avg_agents'] = $viciStatsResult['sum_agent_calls_today'] ?? 0;
+        $this->miniStatsArray['dial_method'] = $viciResult->minDialMethod;
+        $this->miniStatsArray['hopper'] = $viciResult->sumHopperLevel . "/" . $viciResult->maxAutoHopperLevel;
+        $this->miniStatsArray['dropped'] = $viciStatsResult['sum_drops_today'] . "/" . $viciStatsResult['sum_answers_today'];
+        $this->miniStatsArray['drops_today'] = round($viciStatsResult['sum_drops_today'] ?? 0);
+        $this->miniStatsArray['answers_today'] = $viciStatsResult['sum_answers_today'] ?? 0;
+        $this->miniStatsArray['dl_diff'] = sprintf("%01.2f", $viciStatsResult['avg_differential_onemin']);
+        $this->miniStatsArray['statuses'] = $viciResult->minDialStatuses;
+
+        $this->miniStatsArray['outbound_today'] = $this->miniStatsArray['calls_today'] - ($this->miniStatsArray['drops_today'] + $this->miniStatsArray['answers_today']);
+
+
+        $this->miniStatsArray['leads_in_hopper'] = 0;
+        $this->miniStatsArray['drop_percent'] = $viciStatsResult['sum_drops_today'];
+
+        $this->miniStatsArray['drop_percent'] = sprintf("%01.2f",
+            round(($this->MathZDC($viciStatsResult['sum_drops_today'], $viciStatsResult['sum_answers_today']) * 100), 2)
+        );
+        $this->miniStatsArray['diff'] = sprintf("%01.2f",
+            round(($this->MathZDC($viciStatsResult['avg_differential_onemin'], $viciStatsResult['avg_agents_average_onemin']) * 100), 2)
+        );
+        $this->miniStatsArray['order'] = $viciResult->minLeadOrder;
     }
 
     public function callStatus(): void
     {
+        $results = $this->db->table("vicidial_auto_calls")
+            ->select(["status,campaign_id,phone_number,server_ip,UNIX_TIMESTAMP(call_time) as unix_call_time,call_type,queue_priority,agent_only"])
+            ->whereNotIn("status",['XFER'])
+            ->whereIn("campaign_id", $this->selectedCampaignIds)
+            ->get();
 
+        $STARTtime = date("U");
+
+        if(!empty($results)){
+            foreach($results as $callData){
+                if($callData['status'] == "LIVE"){
+                    $this->boxOutLive++;
+
+                    $arr = ["status" => $callData['status'],
+                        "campaign" => $callData['campaign_id'],
+                        "phone" => $callData['phone_number'],
+                        "serverip" => $callData['server_ip'],
+                        "dialtime" => $this->sec_convert($STARTtime - $callData['unix_call_time'], "M"),
+                        "call_type" => $callData['call_type'],
+                        "priority" => $callData['queue_priority']];
+                    $this->vcWaitingList[] = $arr;
+
+                    if ($callData['agent_only'] > 0) {
+                        $this->boxAgentonlycount++;
+                    }
+
+                } else {
+                    if ($callData['status'] == "IVR") {
+                        $this->boxInIvr++;
+
+                        $arr = ["status" => $callData['status'],
+                            "campaign" => $callData['campaign_id'],
+                            "phone" => $callData['phone_number'],
+                            "serverip" => $callData['server_ip'],
+                            "dialtime" => $this->sec_convert($STARTtime - $callData['unix_call_time'], "M"),
+                            "call_type" => $callData['call_type'],
+                            "priority" => $callData['queue_priority']];
+                        $this->vcWaitingList[] = $arr;
+
+                        if ($callData['agent_only'] > 0) {
+                            $this->boxAgentonlycount++;
+                        }
+                    }
+                    if ($callData['status'] !== "CLOSER"){
+                        $this->boxOutRing++;
+                    }
+                }
+                $this->boxOutTotal++;
+            }
+        }
     }
 
     public function listCallerIDs(): void

@@ -5,6 +5,9 @@ namespace Phpdominicana\Lightwave\Providers;
 use Phpdominicana\Lightwave\Application;
 use Phpdominicana\Lightwave\Database\DatabasePDO;
 use Phpdominicana\Lightwave\Gateways\Realtime\RealtimeRepository;
+use Phpdominicana\Lightwave\Gateways\VicidialCampaigns\VicidialCampaignFactory;
+use Phpdominicana\Lightwave\Gateways\VicidialCampaigns\VicidialCampaignGateway;
+use Phpdominicana\Lightwave\Gateways\VicidialCampaigns\VicidialCampaignRepository;
 use Phpdominicana\Lightwave\Gateways\VicidialCampaignStats\CampaignStatsFactory;
 use Phpdominicana\Lightwave\Gateways\VicidialCampaignStats\VicidialCampaignStatsGateway;
 use Phpdominicana\Lightwave\Gateways\VicidialCampaignStats\VicidialCampaignStatsRepository;
@@ -22,7 +25,7 @@ class AppServiceProvider implements ProviderInterface
         $container['VicidialLiveAgentService']  = fn () => new VicidialLiveAgentService($container['psr11Container']);
         $container['VicidialLiveAgentGateway']  = fn () => new VicidialLiveAgentGateway($container['psr11Container']);
         $container['RealtimeRepository'] = fn () => new RealtimeRepository(
-            'ONLY',
+            'Yes',
             [],
             [],
             [],
@@ -37,5 +40,12 @@ class AppServiceProvider implements ProviderInterface
                 new CampaignStatsFactory(),
             )
         );
+        $container['VicidialCampaignRepository'] = fn () => new VicidialCampaignRepository(
+            new VicidialCampaignGateway(
+                new DatabasePDO($container['pdo']),
+                new VicidialCampaignFactory(),
+            )
+        );
+        $container['DataBaseInterface'] = fn () => new DatabasePDO($container['pdo']);
     }
 }

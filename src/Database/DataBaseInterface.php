@@ -8,7 +8,11 @@ interface DataBaseInterface
 
     public function select(array $columns = ['*']): DataBaseInterface;
 
-    public function where(string $column,string $value, string $operator = '='): DataBaseInterface;
+    public function where(string $column, string $operator = '=', string $value = ''): DataBaseInterface;
+
+    public function whereIn(string $column, array $values): DataBaseInterface;
+
+    public function whereNotIn(string $column, array $values): DataBaseInterface;
 
     public function get(): array;
 
