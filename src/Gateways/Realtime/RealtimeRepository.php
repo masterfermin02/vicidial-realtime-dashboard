@@ -20,6 +20,11 @@ final class RealtimeRepository
     protected int $boxOutRing = 0;
     protected int $boxOutTotal = 0;
 
+    protected array $vcCallerIDs = [];
+    protected array $vcCustPhonesArray = [];
+
+    protected int $boxRingAgents = 0;
+
     public function __construct(
         protected string $isInbound,
         protected array $miniStatsArray,
@@ -216,12 +221,230 @@ final class RealtimeRepository
 
     public function listCallerIDs(): void
     {
+        $result = $this->db
+            ->table("vicidial_auto_calls")
+            ->select(["callerid","lead_id","phone_number"])
+            ->get();
+        foreach ($result as $call) {
+            $this->vcCallerIDs[] = $call['callerid'];
+            $this->vcCustPhonesArray[$call['lead_id']] = $call['phone_number'];
+        }
+    }
 
+    public function getAgentPaused(): int
+    {
+        $result =  $this->db
+            ->table('vicidial_campaigns')
+            ->where('agent_pause_codes_active', '!=', 'N')
+            ->whereIn('campaign_id', $this->selectedCampaignIds)
+            ->get();
+
+        if (count($result) > 0) {
+            return $result[0]['totalPaused'];
+        }
+
+        return 0;
     }
 
     public function listAgents(): void
     {
+        $query = $this->db->table("vicidial_live_agents");
+        $results = $query->query("select extension,vicidial_live_agents.user,conf_exten,vicidial_live_agents.status,vicidial_live_agents.server_ip,
+        UNIX_TIMESTAMP(last_call_time) as lct,UNIX_TIMESTAMP(last_call_finish) as lcf,call_server_ip,vicidial_live_agents.campaign_id,
+        vicidial_users.user_group,vicidial_users.full_name,vicidial_live_agents.comments,vicidial_live_agents.calls_today,
+        vicidial_live_agents.callerid,lead_id,UNIX_TIMESTAMP(last_state_change) as lsf,on_hook_agent,ring_callerid,agent_log_id
+        from vicidial_live_agents
+        join vicidial_users on vicidial_users.user = vicidial_live_agents.user
+        where vicidial_users.user_hide_realtime='0'");
+        /**
+         * $agents -> extension
+         * $agents -> user
+         * $agents -> conf_exten
+         * $agents -> status
+         * $agents -> server_ip
+         * $agents -> lct
+         * $agents -> lcf
+         * $agents -> call_server_ip
+         * $agents -> campaign_id
+         * $agents -> user_group
+         * $agents -> full_name
+         * $agents -> comments
+         * $agents -> calls_today
+         * $agents -> callerid
+         * $agents -> lead_id
+         * $agents -> lsf
+         * $agents -> on_hook_agent
+         * $agents -> ring_callerid
+         * $agents -> agent_log_id
+         */
 
+        $agents_pause_code_active = $this->getAgentPaused();
+
+        foreach($results as $agents){
+
+            if($agents['on_hook_agent'] == "Y"){
+                $this->boxRingAgents++;
+                if (strlen($agents -> ring_callerid) > 18)
+                    $agents -> status = "RING";
+            }
+            if($agents['lead_id'] != 0){
+                $mostrecent = $this->checkThreeWay($agents['lead_id']);
+                if ($mostrecent) {
+                    $agents['status'] = "3-WAY";
+                }
+            }
+
+            if (preg_match("/READY|PAUSED/i",$agents['status']))
+            {
+                $agents['lct'] = $agents['lsf'];
+
+                if ($agents['lead_id'] > 0)
+                {
+                    $agents['status'] =	'DISPO';
+                }
+            }
+
+            if($agents_pause_code_active > 0){
+                $pausecode = 'N/A';
+            }else{
+                $pausecode = 'N/A';
+            }
+
+            if (preg_match("/INCALL/i",$agents['status']))
+            {
+                $parked_channel = $this->getParkedCount($agents['callerid']);
+
+                if ($parked_channel > 0)
+                {
+                    $agents['status'] =	'PARK';
+                }
+                else
+                {
+                    if (!in_array($agents['callerid'], $this->vcCallerIDs) && !preg_match("/EMAIL/i",$agents['comments']) && !preg_match("/CHAT/i",$agents['comments']))
+                    {
+                        $agents['lct'] = $agents['lsf'];
+                        $agents['status'] =	'DEAD';
+                    }
+                }
+
+                if ( (preg_match("/AUTO/i",$agents['comments'])) or (strlen($agents['comments'])<1) )
+                {
+                    $CM='A';
+                }
+                else
+                {
+                    if (preg_match("/INBOUND/i",$agents['comments']))
+                    {
+                        $CM='I';
+                    }
+                    else if (preg_match("/EMAIL/i",$agents['comments']))
+                    {
+                        $CM='E';
+                    }
+                    else
+                    {
+                        $CM='M';
+                    }
+                }
+            }
+            else {
+                $CM=' ';
+            }
+
+            $STARTtime = date("U");
+            $call_time_S = 0;
+            if (!preg_match("/INCALL|QUEUE|PARK|3-WAY/i",$agents['status']))
+            {
+                $call_time_S = ($STARTtime - $agents['lsf']);
+            }
+            else if (preg_match("/3-WAY/i",$agents['status']))
+            {
+                $call_time_S = ($STARTtime - $mostrecent);
+            }
+            else
+            {
+                $call_time_S = ($STARTtime - $agents['lct']);
+            }
+
+            $call_time_MS =		$this -> sec_convert($call_time_S,'M');
+            $call_time_MS =		sprintf("%7s", $call_time_MS);
+            $custPhone = "";
+
+
+            //lets update agents count
+            switch ($agents['status']){
+                case "DEAD":
+                    if($call_time_S < 21600){
+                        $this->boxAgentTotal++;
+                        $this-> boxAgentDead++;
+                    }
+                    break;
+                case "DISPO":
+                    if($call_time_S < 21600){
+                        $this -> boxAgentTotal++;
+                        $this -> boxAgentDispo++;
+                    }
+                    break;
+                case "PAUSED":
+                    if($call_time_S < 21600){
+                        $this -> boxAgentTotal++;
+                        $this -> boxAgentPaused++;
+                    }
+                    break;
+                case "INCALL":
+                case "3-WAY":
+                case "QUEUE":
+                    $this -> boxAgentIncall++;
+                    $this -> box_agent_total++;
+                    $custPhone = isset($this->vcCustPhonesArray[$agents['lead_id']]) ? $this->vcCustPhonesArray[$agents['lead_id']] : "";
+
+                    break;
+                case "READY":
+                case "CLOSER":
+                    $this->boxAgentReady++;
+                    $this->boxAgentTotal++;
+                    break;
+
+            }
+
+            if(in_array($agents['status'],["DEAD","DISPO","PAUSED"]) && $call_time_S >= 21600) continue;
+
+            if($agents['status'] == "PAUSED"){
+                if ($agents_pause_code_active > 0)
+                {
+                    $pcode = $this->getPauseCode($agents['agent_log_id'],$agents['user']);
+                    if($pcode && !empty($pcode))
+                        $pausecode = sprintf("%-6s", $pcode);
+                    else
+                        $pausecode = "N/A";
+                }
+                else
+                {
+                    $pausecode='N/A';
+                }
+            }
+
+
+            $vcAgent = [];
+            $vcAgent['extension'] = $agents['extension'];
+            $vcAgent["phone"] = sprintf("%-12s",$this->retrivePhone($agents['extension'], $agents['server_ip']));
+            $vcAgent['cust_phone'] = $custPhone;
+            $vcAgent['user'] = sprintf("%-20s", $agents['user']);
+            $vcAgent['sessionid'] = sprintf("%-9s", $agents['conf_exten']);
+            $vcAgent['status'] = $agents['status'];
+            $vcAgent['serverip'] = sprintf("%-15s", $agents['server_ip']);
+            $vcAgent['call_serverip'] = sprintf("%-15s", $agents['call_server_ip']);
+            $vcAgent['campaign_id'] = sprintf("%-10s", $agents['campaign_id']);
+            $vcAgent['comments'] = $agents['comments'];
+            $vcAgent['calls_today'] = sprintf("%-5s", $agents['calls_today']);
+            $vcAgent['user_group'] = sprintf("%-12s", $agents['user_group']);
+            $vcAgent['full_name'] = sprintf("%-60s", $agents['full_name']);
+            $vcAgent['pausecode'] = $pausecode;
+            $vcAgent['call_time'] = $call_time_MS;
+            $vcAgent['call_type'] = 0;
+
+            $this -> vcAgentsArray[] = $vcAgent;
+        }
     }
 
     public function getBoxStatus(): array
@@ -246,6 +469,10 @@ final class RealtimeRepository
         $return['callstatus'] = $this->getBoxStatus();
         $return['waiting'] = $this->vcWaitingList;
         return $return;
+    }
+
+    private function checkThreeWay($lead_id){
+        return false;
     }
 
     private function agentNonPaused()
