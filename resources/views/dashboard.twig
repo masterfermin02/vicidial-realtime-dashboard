@@ -7,7 +7,6 @@
             eventSource.addEventListener('realtimeData', function (event) {
                 var data = JSON.parse(event.data);
                 realtimeData = data.realtimeData.content;
-                console.log(realtimeData);
                 agents = realtimeData.agents;
                 todayCalls = realtimeData.stats.calls_today;
                 dropCalls = realtimeData.stats.drop_calls;
