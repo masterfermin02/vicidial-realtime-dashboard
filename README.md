@@ -1,5 +1,5 @@
 # Dashboard realtime app example for vicidiail
-This is a simple realtime dashboard app example for vicidiail built with lightwave.
+This is a simple realtime dashboard app example for vicidial built with lightwave.
 
 Lightwave is a simple PHP starter kit created by the PHP dominicana community. It is designed to help you get started with PHP development quickly. It includes a simple web server, a simple router It is designed to be simple and easy to use.
 
