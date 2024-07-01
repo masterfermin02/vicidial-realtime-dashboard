@@ -450,7 +450,7 @@ final class RealtimeRepository
         $agent['agents_waiting'] = $this->boxAgentReady;
         $agent['agents_paused'] = $this->boxAgentPaused;
         $agent['agents_dead'] = $this->boxAgentDead;
-        $agent['agents_dispo'] = $this-> boxAgentDispo;
+        $agent['agents_dispo'] = $this->boxAgentDispo;
         return $agent;
     }
 

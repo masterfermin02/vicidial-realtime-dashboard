@@ -29,6 +29,18 @@ class RouteServiceProvider implements ProviderInterface
                 ]
             )
         );
+        $app->get('dashboard_sse',
+            new Route(
+                '/dashboard/sse',
+                [
+                    '_controller' => [DashboardController::class, 'sse'],
+                    'container' => new Psr11Container($app->getContainer()),
+                    '_middleware' => [
+                        AuthenticationMiddleware::class,
+                    ]
+                ]
+            )
+        );
         $app->get('login',
             new Route(
                 '/login',
