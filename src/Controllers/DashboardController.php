@@ -18,11 +18,9 @@ class DashboardController
     }
     public function index(): Response
     {
-        $realtimeService = $this->container->get('RealtimeService');
-
-        $realtimeData = $realtimeService->getRealtimeData();
         $view = $this->container->get('view');
-        return new Response($view->render('dashboard.twig', ['realtimeData' => $realtimeData]));
+
+        return new Response($view->render('dashboard.twig', []));
     }
 
     public function sse(): StreamedResponse
